@@ -4,8 +4,6 @@ export const addToWatchlist = async (req, res) => {
   try {
     const { movieId, status, rating, notes } = req.body;
 
-    // For testing, userId can come from body.
-    // Later JWT middleware ke baad req.user.id use karna.
     const userId = req.user?.id || req.body.userId;
 
     if (!userId) {
@@ -20,11 +18,8 @@ export const addToWatchlist = async (req, res) => {
       });
     }
 
-    // Check if movie exists
     const movie = await prisma.movie.findUnique({
-      where: {
-        id: movieId,
-      },
+      where: { id: movieId },
     });
 
     if (!movie) {
@@ -33,7 +28,6 @@ export const addToWatchlist = async (req, res) => {
       });
     }
 
-    // Check if movie is already in watchlist
     const existingEntry = await prisma.watchlistItem.findUnique({
       where: {
         userId_movieId: {
@@ -49,7 +43,6 @@ export const addToWatchlist = async (req, res) => {
       });
     }
 
-    // Create watchlist item
     const watchlistItem = await prisma.watchlistItem.create({
       data: {
         userId,
@@ -69,6 +62,48 @@ export const addToWatchlist = async (req, res) => {
 
     return res.status(500).json({
       error: "Failed to add movie to watchlist",
+      details: error.message,
+    });
+  }
+};
+
+export const removeFromWatchlist = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        error: "Unauthorized",
+      });
+    }
+
+    const watchlistItem = await prisma.watchlistItem.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!watchlistItem) {
+      return res.status(404).json({
+        error: "Watchlist item not found",
+      });
+    }
+
+    if (watchlistItem.userId !== req.user.id) {
+      return res.status(403).json({
+        error: "Not allowed to delete this watchlist item",
+      });
+    }
+
+    await prisma.watchlistItem.delete({
+      where: { id: req.params.id },
+    });
+
+    return res.status(200).json({
+      status: "success",
+      message: "Movie removed from watchlist",
+    });
+  } catch (error) {
+    console.error("Remove watchlist error:", error);
+
+    return res.status(500).json({
+      error: "Failed to remove watchlist item",
       details: error.message,
     });
   }
